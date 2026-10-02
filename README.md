@@ -43,7 +43,7 @@ chmod +x bin/cumora-task
 
 | 操作场景 | 命令示例 | 功能说明 |
 | :--- | :--- | :--- |
-| **查询花名册** | `cumora-task agents` | 查看全团队 9 位 Agent 在线状态与 A2A 端点 |
+| **查询花名册** | `cumora-task agents` | 查看全团队 10 位 Agent 在线状态与 A2A 端点 |
 | **派发任务** | `cumora-task call --to xiuyuan --msg "修复 Issue #43" --timeout 180` | 通过网关调度派单，签发全局唯一 `gatewayTaskId` |
 | **两阶段认领** | `cumora-task claim gw_task_xxx` | 执行 Agent 物理认领，换取防伪签名 Receipt |
 | **心跳进度遥测** | `cumora-task progress gw_task_xxx --percent 50 --stage coding --msg "修远正在编写代码"` | 实时刷新进度与心跳，重置 10 分钟看门狗 |
