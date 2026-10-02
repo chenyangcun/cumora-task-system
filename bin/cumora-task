@@ -127,6 +127,23 @@ def cmd_progress(args):
         print(f"❌ 遥测上报失败: {res}")
         sys.exit(1)
 
+def cmd_complete(args):
+    payload = {
+        "result": args.result,
+    }
+    if args.token:
+        payload["claimToken"] = args.token
+    res = make_request(f"/api/gateway/tasks/{args.task_id}/complete", method="POST", body=payload)
+    if res.get("ok"):
+        print(f"🏁 任务交单结项成功: {args.task_id}")
+        print(f"  • Status:     completed")
+        print(f"  • Result:     {args.result}")
+        if res.get("callbackDispatched"):
+            print(f"  • Callback:   已触发向发起方 Agent 的逆向 A2A 唤醒通知 ⚡")
+    else:
+        print(f"❌ 任务结项失败: {res}")
+        sys.exit(1)
+
 def cmd_status(args):
     res = make_request(f"/api/gateway/tasks/{args.task_id}")
     if res.get("ok"):
@@ -196,6 +213,13 @@ def main():
     p_prog.add_argument("--stage", required=True, help="当前阶段 (如 coding, testing, verifying)")
     p_prog.add_argument("--msg", help="进度说明文字")
     p_prog.set_defaults(func=cmd_progress)
+
+    # complete
+    p_comp = sub.add_parser("complete", help="完成交付交单 (触发逆向 A2A 回调唤醒发起方)")
+    p_comp.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx 或 issue-43)")
+    p_comp.add_argument("--result", required=True, help="结项成果描述或 PR 链接")
+    p_comp.add_argument("--token", help="两阶段凭据 (可选)")
+    p_comp.set_defaults(func=cmd_complete)
 
     # status
     p_stat = sub.add_parser("status", help="查询任务详情与状态")
