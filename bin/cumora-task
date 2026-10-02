@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""
+Cumora Task System & Gateway CLI Tool (cumora-task)
+统一任务系统客户端命令行工具，供所有 Agent (知夏, 承序, 求索, 修远, 靖安等) 开箱即用。
+
+支持命令：
+  cumora-task call --to <agent> --msg "<text>" [--from <agent>] [--timeout 60]
+  cumora-task claim <taskId> [--token <claimToken>]
+  cumora-task progress <taskId> --percent <0-100> --stage <stage> [--msg "<msg>"]
+  cumora-task status <taskId>
+  cumora-task agents
+  cumora-task logs [--limit 10] [--to <agent>]
+"""
+
+import argparse
+import json
+import os
+import ssl
+import sys
+import time
+import urllib.request
+import urllib.error
+
+DEFAULT_GATEWAY_URL = os.environ.get("CUMORA_GATEWAY_URL", "https://192.168.123.253:5181")
+DEFAULT_HOST_HEADER = os.environ.get("CUMORA_HOST_HEADER", "cumora.tailcbdcf8.ts.net")
+DEFAULT_COMPANY_ID = os.environ.get("CUMORA_COMPANY_ID", "co-a661f129-6")
+DEFAULT_A2A_TOKEN = os.environ.get("CUMORA_A2A_MASTER_TOKEN", "6d4c7949c030a6f4d434f992bd72187f0d42d73fdfb91b9a")
+
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+
+def get_auth_token():
+    # 优先环境变量
+    token = os.environ.get("CUMORA_AUTH_TOKEN")
+    if token and token.strip():
+        return token.strip()
+    # 其次检查本地 session token
+    token_file = "/tmp/admin_session_token.txt"
+    if os.path.exists(token_file):
+        try:
+            with open(token_file) as f:
+                t = f.read().strip()
+                if t:
+                    return t
+        except Exception:
+            pass
+    # 兜底内部 A2A Master Token
+    return DEFAULT_A2A_TOKEN
+
+def make_request(path, method="GET", body=None, timeout=30):
+    url = f"{DEFAULT_GATEWAY_URL.rstrip('/')}{path}"
+    headers = {
+        "Host": DEFAULT_HOST_HEADER,
+        "Authorization": f"Bearer {get_auth_token()}",
+        "x-company-id": DEFAULT_COMPANY_ID,
+    }
+    data = None
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(body).encode("utf-8")
+
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
+            text = resp.read().decode("utf-8")
+            try:
+                return json.loads(text)
+            except Exception:
+                return {"raw": text, "status": resp.status}
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8")
+        try:
+            err_json = json.loads(err_body)
+            print(f"[Error {e.code}] {err_json.get('message') or err_json.get('error') or err_body}", file=sys.stderr)
+            return err_json
+        except Exception:
+            print(f"[Error {e.code}] {err_body}", file=sys.stderr)
+            return {"error": f"HTTP {e.code}", "detail": err_body}
+    except Exception as e:
+        print(f"[Network Error] {e}", file=sys.stderr)
+        return {"error": "network_error", "detail": str(e)}
+
+def cmd_call(args):
+    payload = {
+        "from": args.from_agent or os.environ.get("CUMORA_AGENT_NAME", "system"),
+        "to": args.to,
+        "text": args.msg,
+        "timeoutSec": args.timeout,
+    }
+    print(f"🚀 发起任务分发: {payload['from']} ➔ {payload['to']} ...")
+    res = make_request("/api/gateway/call", method="POST", body=payload, timeout=args.timeout + 10)
+    if res.get("ok"):
+        print(f"✅ 任务派发成功！")
+        print(f"  • Task ID:    {res.get('gatewayTaskId')}")
+        print(f"  • Target:     {args.to}")
+        print(f"  • Status:     {res.get('status')}")
+    else:
+        print(f"❌ 任务派发失败: {res}")
+        sys.exit(1)
+
+def cmd_claim(args):
+    payload = {}
+    if args.token:
+        payload["claimToken"] = args.token
+    print(f"✍️ 正在执行两阶段认领: {args.task_id} ...")
+    res = make_request(f"/api/gateway/tasks/{args.task_id}/claim", method="POST", body=payload)
+    if res.get("ok"):
+        print(f"✅ 认领成功！任务已进入 DOING 状态。")
+        print(f"  • Task ID:    {res.get('gatewayTaskId')}")
+        print(f"  • Receipt:    {res.get('claimToken', 'N/A')}")
+    else:
+        print(f"❌ 认领失败: {res}")
+        sys.exit(1)
+
+def cmd_progress(args):
+    payload = {
+        "percent": args.percent,
+        "stage": args.stage,
+        "message": args.msg or f"Progress update: {args.stage} ({args.percent}%)",
+    }
+    res = make_request(f"/api/gateway/tasks/{args.task_id}/progress", method="POST", body=payload)
+    if res.get("ok"):
+        prog = res.get("progress", {})
+        print(f"📡 遥测上报成功: [{prog.get('stage')}] {prog.get('percent')}% · {prog.get('message')}")
+    else:
+        print(f"❌ 遥测上报失败: {res}")
+        sys.exit(1)
+
+def cmd_status(args):
+    res = make_request(f"/api/gateway/tasks/{args.task_id}")
+    if res.get("ok"):
+        print(f"📋 任务状态报告: {args.task_id}")
+        print(f"  • Status:     {res.get('status')}")
+        prog = res.get("progress", {})
+        if prog:
+            print(f"  • Progress:   {prog.get('percent')}% ({prog.get('stage')}) - {prog.get('message')}")
+        if res.get("claimToken"):
+            print(f"  • ClaimToken: {res.get('claimToken')}")
+        if res.get("result"):
+            print(f"  • Result:\n{res.get('result')[:300]}")
+    else:
+        print(f"❌ 获取状态失败: {res}")
+        sys.exit(1)
+
+def cmd_agents(args):
+    res = make_request("/api/gateway/agents")
+    if res.get("ok"):
+        agents = res.get("agents", [])
+        print(f"👥 在线 Agent 花名册 (共 {len(agents)} 位):")
+        for a in agents:
+            status_badge = "🟢 ONLINE" if a.get("status") == "online" else "⚪ OFFLINE"
+            print(f"  • {a.get('name', a.get('id')):<8} ({a.get('id')}): {status_badge} | {a.get('a2aEndpoint')}")
+    else:
+        print(f"❌ 获取花名册失败: {res}")
+        sys.exit(1)
+
+def cmd_logs(args):
+    path = f"/api/gateway/calls?limit={args.limit}"
+    if args.to:
+        path += f"&to={args.to}"
+    res = make_request(path)
+    if res.get("ok"):
+        logs = res.get("logs", [])
+        print(f"📑 网关调用审计流水 (最新 {len(logs)} 条):")
+        for log in logs:
+            badge = "✅" if log.get("status") == "success" else "❌"
+            summary = (log.get("summaryText") or "").replace("\n", " ")[:60]
+            print(f"  {badge} [{log.get('startedAt', '')[11:19]}] {log.get('fromAgent')} ➔ {log.get('toAgent')} ({log.get('durationMs')}ms) | {summary}")
+    else:
+        print(f"❌ 获取审计流水失败: {res}")
+        sys.exit(1)
+
+def main():
+    parser = argparse.ArgumentParser(description="Cumora Task & Gateway CLI")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    # call
+    p_call = sub.add_parser("call", help="跨 Agent 派发任务")
+    p_call.add_argument("--to", required=True, help="目标 Agent ID (如 xiuyuan, qiusuo, chengxu)")
+    p_call.add_argument("--msg", required=True, help="任务描述或指令正文")
+    p_call.add_argument("--from-agent", dest="from_agent", help="发起方 Agent ID (默认环境变量 CUMORA_AGENT_NAME 或 system)")
+    p_call.add_argument("--timeout", type=int, default=60, help="超时时间 (秒，默认 60)")
+    p_call.set_defaults(func=cmd_call)
+
+    # claim
+    p_claim = sub.add_parser("claim", help="两阶段接单认领 (换取 ClaimToken)")
+    p_claim.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx)")
+    p_claim.add_argument("--token", help="两阶段凭证 (可选)")
+    p_claim.set_defaults(func=cmd_claim)
+
+    # progress
+    p_prog = sub.add_parser("progress", help="中间进度与心跳遥测上报")
+    p_prog.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx 或外部任务如 issue-43)")
+    p_prog.add_argument("--percent", type=int, required=True, help="进度百分比 (0-100)")
+    p_prog.add_argument("--stage", required=True, help="当前阶段 (如 coding, testing, verifying)")
+    p_prog.add_argument("--msg", help="进度说明文字")
+    p_prog.set_defaults(func=cmd_progress)
+
+    # status
+    p_stat = sub.add_parser("status", help="查询任务详情与状态")
+    p_stat.add_argument("task_id", help="网关任务 ID")
+    p_stat.set_defaults(func=cmd_status)
+
+    # agents
+    p_agents = sub.add_parser("agents", help="列出网关所有已注册 Agent")
+    p_agents.set_defaults(func=cmd_agents)
+
+    # logs
+    p_logs = sub.add_parser("logs", help="拉取网关审计流水")
+    p_logs.add_argument("--limit", type=int, default=10, help="条数限制 (默认 10)")
+    p_logs.add_argument("--to", help="按目标 Agent 过滤")
+    p_logs.set_defaults(func=cmd_logs)
+
+    args = parser.parse_args()
+    args.func(args)
+
+if __name__ == "__main__":
+    main()
