@@ -7,9 +7,13 @@ Cumora Task System & Gateway CLI Tool (cumora-task)
   cumora-task call --to <agent> --msg "<text>" [--from <agent>] [--timeout 60]
   cumora-task claim <taskId> [--token <claimToken>]
   cumora-task progress <taskId> --percent <0-100> --stage <stage> [--msg "<msg>"]
+  cumora-task block <taskId> --reason "<reason>" [--helper <agent>]
+  cumora-task complete <taskId> --result "<result>" [--token <claimToken>]
   cumora-task status <taskId>
   cumora-task agents
   cumora-task logs [--limit 10] [--to <agent>]
+
+提示：对于外部 GitHub Issue，<taskId> 可直接使用 issue-<id> (如 issue-43)，系统自动建档与流转。
 """
 
 import argparse
@@ -221,7 +225,7 @@ def main():
 
     # claim
     p_claim = sub.add_parser("claim", help="两阶段接单认领 (换取 ClaimToken)")
-    p_claim.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx)")
+    p_claim.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx 或外部任务如 issue-43)")
     p_claim.add_argument("--token", help="两阶段凭证 (可选)")
     p_claim.set_defaults(func=cmd_claim)
 
@@ -235,21 +239,21 @@ def main():
 
     # complete
     p_comp = sub.add_parser("complete", help="完成交付交单 (触发逆向 A2A 回调唤醒发起方)")
-    p_comp.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx 或 issue-43)")
+    p_comp.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx 或外部任务如 issue-43)")
     p_comp.add_argument("--result", required=True, help="结项成果描述或 PR 链接")
     p_comp.add_argument("--token", help="两阶段凭据 (可选)")
     p_comp.set_defaults(func=cmd_complete)
 
     # block
     p_block = sub.add_parser("block", help="上报阻碍挂起任务 (触发 Jev 智能分诊派生解阻子任务)")
-    p_block.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx)")
+    p_block.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx 或外部任务如 issue-43)")
     p_block.add_argument("--reason", required=True, help="阻碍原因详细描述")
     p_block.add_argument("--helper", help="指定协助排查的 Agent (可选，不传则由 Jev 决策模型智能分诊)")
     p_block.set_defaults(func=cmd_block)
 
     # status
     p_stat = sub.add_parser("status", help="查询任务详情与状态")
-    p_stat.add_argument("task_id", help="网关任务 ID")
+    p_stat.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx 或外部任务如 issue-43)")
     p_stat.set_defaults(func=cmd_status)
 
     # agents
