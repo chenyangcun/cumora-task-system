@@ -85,13 +85,53 @@ def make_request(path, method="GET", body=None, timeout=30):
         print(f"[Network Error] {e}", file=sys.stderr)
         return {"error": "network_error", "detail": str(e)}
 
+class DodAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        items = getattr(namespace, self.dest, None)
+        if items is None:
+            items = []
+        else:
+            items = list(items)
+        if isinstance(values, list):
+            items.extend(values)
+        else:
+            items.append(values)
+        setattr(namespace, self.dest, items)
+
 def cmd_call(args):
     payload = {
         "from": args.from_agent or os.environ.get("CUMORA_AGENT_NAME", "system"),
         "to": args.to,
-        "text": args.msg,
         "timeoutSec": args.timeout,
     }
+
+    # 当提供结构化参数时，自动组装为结构化 TaskEnvelope
+    if args.issue or args.goal or (args.dod and len(args.dod) > 0):
+        task_name = args.msg
+        if not task_name:
+            if args.issue:
+                task_name = f"Issue #{args.issue}: {args.goal or ''}".strip()
+            else:
+                task_name = args.goal or "Structured Task"
+        envelope = {
+            "task": task_name,
+            "goal": args.goal or args.msg or "",
+            "dod": args.dod or [],
+        }
+        if args.issue:
+            issue_val = str(args.issue).strip().lstrip("#")
+            issue_url = issue_val if issue_val.startswith("http") else f"https://github.com/yetone/cumora/issues/{issue_val}"
+            envelope["context"] = {
+                "issueUrl": issue_url
+            }
+        payload["envelope"] = envelope
+        payload["text"] = json.dumps(envelope, ensure_ascii=False)
+    else:
+        if not args.msg:
+            print("❌ 缺少任务描述: 请提供 --msg 或结构化参数 (--issue, --goal, --dod)", file=sys.stderr)
+            sys.exit(1)
+        payload["text"] = args.msg
+
     print(f"🚀 发起任务分发: {payload['from']} ➔ {payload['to']} ...")
     res = make_request("/api/gateway/call", method="POST", body=payload, timeout=args.timeout + 10)
     if res.get("ok"):
@@ -236,7 +276,10 @@ def main():
     # call
     p_call = sub.add_parser("call", help="跨 Agent 派发任务")
     p_call.add_argument("--to", required=True, help="目标 Agent ID (如 xiuyuan, qiusuo, chengxu)")
-    p_call.add_argument("--msg", required=True, help="任务描述或指令正文")
+    p_call.add_argument("--msg", help="任务描述或指令正文")
+    p_call.add_argument("--issue", help="关联 GitHub Issue 编号或 URL (如 65)")
+    p_call.add_argument("--goal", help="任务核心目标")
+    p_call.add_argument("--dod", nargs="+", action=DodAction, default=[], help="验收标准清单 (DoD)")
     p_call.add_argument("--from-agent", dest="from_agent", help="发起方 Agent ID (默认环境变量 CUMORA_AGENT_NAME 或 system)")
     p_call.add_argument("--timeout", type=int, default=60, help="超时时间 (秒，默认 60)")
     p_call.set_defaults(func=cmd_call)
