@@ -282,10 +282,26 @@ def cmd_status(args):
             print(f"  • HealthState:{health}{h_badge}")
         if res.get("claimToken"):
             print(f"  • ClaimToken: {res.get('claimToken')}")
-        if res.get("result"):
-            print(f"  • Result:\n{res.get('result')[:300]}")
+        result_text = res.get("result")
+        if result_text:
+            if getattr(args, "full", False) or len(result_text) <= 300:
+                print(f"  • Result:\n{result_text}")
+            else:
+                print(f"  • Result (前 300 字符，查看完整内容请加 --full):\n{result_text[:300]}...")
     else:
         print(f"❌ 获取状态失败: {res}")
+        sys.exit(1)
+
+def cmd_result(args):
+    res = make_request(f"/api/gateway/tasks/{args.task_id}")
+    if res.get("ok"):
+        result_text = res.get("result")
+        if result_text:
+            print(result_text)
+        else:
+            print(f"⚠️ 任务 {args.task_id} 尚未生成结果文本 (当前状态: {res.get('status')})")
+    else:
+        print(f"❌ 获取任务结果失败: {res}")
         sys.exit(1)
 
 def cmd_agents(args):
@@ -370,7 +386,13 @@ def main():
     # status
     p_stat = sub.add_parser("status", help="查询任务详情与状态")
     p_stat.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx 或外部任务如 issue-43)")
+    p_stat.add_argument("--full", action="store_true", help="打印完整的 Result 交付正文，不作截断")
     p_stat.set_defaults(func=cmd_status)
+
+    # result
+    p_res = sub.add_parser("result", help="直接提取并打印任务交付的完整 Markdown 结果正文")
+    p_res.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx 或外部任务如 issue-43)")
+    p_res.set_defaults(func=cmd_result)
 
     # agents
     p_agents = sub.add_parser("agents", help="列出网关所有已注册 Agent")
