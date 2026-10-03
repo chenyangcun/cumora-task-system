@@ -31,8 +31,16 @@ metadata:
 
 ### 1. 跨 Agent 派发任务 (Dispatch)
 ```bash
+# 方式 A (推荐: 结构化精炼信封派发，Token 暴降 80%，防雪崩):
+cumora-task call --to qiusuo --issue 78 --goal "实现 A2A 派发超时代偿" --dod "单测通过" "提交 PR"
+
+# 方式 B (普通自然语言文本派发):
 cumora-task call --to xiuyuan --msg "修复 Issue #43: 补齐 x-company-id 请求头"
-# 输出: Task ID: gw_task_xxx，自动向目标 Agent 投递任务
+
+# 进阶参数:
+# --project <name>: 指定业务域槽位隔离 (Issue #74)
+# --new-session: 强制开辟全新会话沙箱 (Issue #74, 避免历史上下文膨胀)
+# 输出: Task ID: gw_task_xxx，网关 2 秒内异步握手返回
 ```
 
 ### 2. 两阶段接单认领 (Claim Handshake)
@@ -129,3 +137,9 @@ cumora-task logs --limit 10
   - 遇到重试失败超过 1 次，或者遭遇任何跨领域阻碍（如网络不通、缺包未装、规格不明），**绝对禁止继续自转死磕**！
   - 必须立即执行 `cumora-task block <taskId> --reason "..." [--helper xxx]` 将任务挂起，并根据触发矩阵呼叫对口协助人。
 - **红线**：绝对禁止任何 Agent 在群内或后台静默长跑 10+ 分钟（避免锁死单轮推理队列并触发下游级联阻塞）。
+
+### 4. 派发超时不当失败与遥测驱动自愈 (Timeout != Failure & Telemetry Healing)
+- **底层机制 (Issue #78)**：
+  - 网关已实施两阶段异步派发与超时代偿。若目标 Agent 正处于长程推理或工具调用中，网关在 2 秒 HTTP 握手超时后**绝不主动宣告任务失败，绝不触发 DEAD_LETTER 告警**，而是平滑置为 `dispatched (PENDING_TELEMETRY)` 并立即释放网关并发槽位；
+  - **自愈铁律**：Agent 接收到任务后，只要在 30 秒内调用 `cumora-task progress <taskId> --percent 1 --stage accepted`，网关即时将状态自愈为 `running (HEALTHY)`；
+  - 完工交付调用 `cumora-task complete <taskId> --result "..."` 即可正常结项。无需担心网关断开连接导致任务被杀。
