@@ -52,12 +52,12 @@ cumora-task progress issue-43 --percent 80 --stage testing --msg "正在运行�
 
 ### 4. 遭遇受阻挂起与协助人分诊 (Block & Triage)
 ```bash
-# 场景 A: 命中触发矩阵，指定具体责任人挂起
+# 场景 A (命中触发矩阵): 明确对口领域，显式指定协助人 (--helper 强制直派，形成下意识动作)
+cumora-task block issue-43 --reason "TS2304: Cannot find name 'AdminPayload' 编译报错" --helper qiusuo
 cumora-task block issue-43 --reason "502 Bad Gateway: 统一网关端口 5181 拒绝连接" --helper jingan
-cumora-task block issue-43 --reason "TS2304: Cannot find name 'AdminPayload' 编译失败" --helper qiusuo
-cumora-task block issue-43 --reason "PRD 第 3.2 节关于租户隔离的规格歧义" --helper zhixia
+cumora-task block issue-43 --reason "PRD 第 3.2 节规格歧义，缺少租户隔离字段" --helper zhixia
 
-# 场景 B: 复合或未明错误，留空触发 Jev 智能分诊派生解阻子工单
+# 场景 B (复合或未明错误): 留空 --helper 参数，触发网关 Jev 智能推理极速分诊 (400ms 毫秒级定界)
 cumora-task block issue-43 --reason "第三方 Webhook 鉴权偶发性失败，需联合定位"
 ```
 
@@ -87,17 +87,20 @@ cumora-task logs --limit 10
 
 ---
 
-## 三、错误类型与触发矩阵 (Trigger Matrix)
+## 三、错误类型与触发矩阵 (Trigger Matrix & Jev Routing)
 
-在多 Agent 协作网络中，**严禁越权排查与跨界救火**。发生异常时，严格对照下表进行分诊与挂起：
+在多 Agent 协作网络中，**严禁越权排查与跨界救火**。发生异常时，执行方只需将真实报错与现象填入 `--reason`，**默认绝不传 `--helper` 参数**，网关内嵌的 Jev 决策模型（70ms 毫秒级 TypeSafe 推理）会自动将其精准分流至对应的专业 Agent：
 
-| 异常分类 | 典型错误关键字 / 场景 | 铁律约束与动作 | 强制指定协助人 (`--helper`) |
+| 异常分类 | 典型错误关键字 / 场景 | 铁律约束与动作 | Jev 自动决策指派目标 (默认不传 `--helper`) |
 | :--- | :--- | :--- | :--- |
-| **业务依赖 / 编译 / 代码报错** | `Cannot find package`, `Module not found`, `TS2304`, `SyntaxError`, 单测挂掉, 类型定义缺失 | **100% 强制交由 Dev 处理**<br>• 严禁运维（靖安）或 PM（知夏）跨界修改业务源码<br>• 严禁 Dev 本地自转循环死试 | `--helper qiusuo` (后端/Node/Go/Python)<br>`--helper xiuyuan` (前端/React/Vue/UI) |
-| **基础设施 / 网络 / 端口 / 容器** | `502 Bad Gateway`, `Connection refused`, `ECONNREFUSED`, Docker/容器崩溃, 端口占用 (5432/5181), SSL/TLS 证书, Nginx 5xx | **100% 强制交由 DevOps 处理**<br>• 严禁 Dev 或 PM 擅自修改线上 DB、执行 DDL、或随意启停生产容器 | `--helper jingan` (运维) |
-| **PRD 歧义 / 需求范围 / 验收失败** | 需求规格不明确、业务逻辑冲突、黑盒验收不通过、超出当前版本范围 (Scope Creep) | **100% 强制交由 PM 处理**<br>• 严禁 Dev 擅自脑补设计或私自变更交互规范<br>• PM 专注黑盒验收与范围界定 | `--helper zhixia` (产品经理) |
-| **任务依赖死锁 / 资源调度** | 上游依赖未交付、环形依赖死锁、负责 Agent 长期失联、计算/存储资源配额不足 | 挂起并触发任务编排协调 | `--helper chengxu` (任务管理)<br>`--helper zechuan` (资源) |
-| **未明异常 / 复合多因** | 无法立即判定边界的复杂故障、多端联合异常 | 留空 `--helper` 参数，交由网关 Jev 决策模型毫秒级智能推荐协助人 | *(不传 `--helper`，自动 Jev 分诊)* |
+| **业务依赖 / 编译 / 代码报错** | `Cannot find package`, `Module not found`, `TS2304`, `SyntaxError`, 单测挂掉, 类型定义缺失 | **100% 自动交由 Dev 修复**<br>• 严禁运维（靖安）或 PM（知夏）跨界修改业务源码<br>• 严禁 Dev 本地自转死试 | 自动指派 `@qiusuo` (后端/Go/Node)<br>或 `@xiuyuan` (前端/React/UI) |
+| **基础设施 / 网络 / 端口 / 容器** | `502 Bad Gateway`, `Connection refused`, `ECONNREFUSED`, Docker/容器崩溃, 端口占用 (5432/5181), SSL/TLS, 密码认证失败 | **100% 自动交由 DevOps 排查**<br>• 严禁 Dev 或 PM 擅自修改线上 DB、执行 DDL、或随意启停生产容器 | 自动指派 `@jingan` (运维) |
+| **PRD 歧义 / 需求范围 / 验收失败** | 需求规格不明确、业务逻辑冲突、黑盒验收不通过、超出当前版本范围 (Scope Creep) | **100% 自动交由 PM 裁决**<br>• 严禁 Dev 擅自脑补设计或私自变更交互规范<br>• PM 专注黑盒验收与范围界定 | 自动指派 `@zhixia` (产品经理) |
+| **任务依赖死锁 / 调度阻塞** | 上游依赖未交付、环形依赖死锁、负责 Agent 长期失联 | 挂起并触发 TPM 任务编排协调 | 自动指派 `@chengxu` (任务管理) |
+| **外部资源 / 存储配额 / Token 耗尽** | R2/S3 存储配额耗尽、API Key 余额不足、模型算力额度超限 | 挂起并由资源管理者处理配额 | 自动指派 `@zechuan` (资源存储) |
+
+> ⚠️ **关于 `--helper` 参数的唯一准则**：  
+> **99% 的日常开发场景严禁传 `--helper`！** 只要把报错日志如实贴在 `--reason` 中，Jev 大脑会在 400ms 内自动判断领域并派发解阻任务；**只有在人工或管理者在群里指名道姓要求某人介入时，才允许显式加上 `--helper <agentId>` 作为覆盖！**
 
 ---
 
