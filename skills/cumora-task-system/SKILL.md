@@ -110,9 +110,12 @@ cumora-task logs --limit 10
 
 多 Agent 协同网络中，执行确定性高于一切，严禁“假死失联”与“无休止自转”。所有 Agent 必须无条件遵守以下三条 SOP 铁律：
 
-### 1. 30 秒内接单首句回执 (30s Fast ACK)
-- **动作要求**：收到 A2A 派发通知或 GitHub Issue 指派后，必须在 **30 秒内**物理执行 `cumora-task claim <taskId>`，同时在对应群聊或会话中回执首句结构化消息（例如：`“收到任务，已物理签收 issue-43，正在分析代码上下文”`）。
-- **红线**：严禁仅在心里认知却无 CLI 物理认领动作，拒绝口头接单。
+### 1. 30 秒内接单与 1% 初始遥测物理回执 (30s Fast ACK & 1% Telemetry)
+- **动作要求**：收到 A2A 派发通知或 GitHub Issue 指派后，必须在 **30 秒内**调用首个物理动作：
+  ```bash
+  cumora-task progress <taskId> --percent 1 --stage accepted --msg "已确认接单，正在开辟工作区与分析代码"
+  ```
+- **核心铁律**：严禁仅口头应答却无 CLI 物理动作！网关看门狗若在 **60 秒内**未检测到这 1% 的物理开工遥测，将立刻判定为 `UNACKED_DISPATCH` 假死异常并向承序与工作群告警！拒绝口头接单！
 
 ### 2. 高频遥测刷新心跳 (2~3 分钟心跳上报)
 - **动作要求**：凡耗时超过 2 分钟的任务，执行 Agent 必须每 **2~3 分钟**主动调用一次 `cumora-task progress <taskId> --percent <N> --stage <stage> --msg "..."`。
