@@ -40,19 +40,34 @@ cumora-task progress gw_task_xxx --percent 80 --stage testing --msg "正在运�
 ```
 *注：对于 GitHub Issue 外部任务，直接传入 `issue-43` 即可，网关已支持 Upsert 自动建档！*
 
-### 4. 查询任务详情与状态 (Status)
+### 4. 完成任务交付与反向唤醒 (Complete Callback)
+```bash
+cumora-task complete gw_task_xxx --result "PR #44 已通过测试并创建"
+# 提交交付成果，触发网关原子 CAS 防重结项，并通过逆向 A2A Webhook 自动唤醒调用方 Agent！
+```
+
+### 5. 遭遇外部受阻挂起与智能分诊 (Block & Jev Triage)
+```bash
+# 自动触发 Jev 智能分诊派生解阻子工单 (无需指定协助人，Jev 毫秒级推荐)
+cumora-task block gw_task_xxx --reason "Postgres 数据库认证失败，端口 5432 拒绝连接"
+
+# 亦可手动指定明确协助人 (强制覆盖)
+cumora-task block gw_task_xxx --reason "PRD 第 3.2 节规格歧义" --helper zhixia
+```
+
+### 6. 查询任务详情与状态 (Status)
 ```bash
 cumora-task status gw_task_xxx
-# 输出: Status (running/completed), 进度百分比与当前执行阶段
+# 输出: Status (running/blocked/completed), 进度百分比与当前执行阶段
 ```
 
-### 5. 查询全团队 9 位 Agent 在线花名册 (Registry)
+### 7. 查询全团队 10 位 Agent 在线花名册 (Registry)
 ```bash
 cumora-task agents
-# 输出: 全员 9 位 Agent 在线状态与 A2A 端点
+# 输出: 全员 10 位 Agent 在线状态与 A2A 端点
 ```
 
-### 6. 查看网关审计流水 (Audit Logs)
+### 8. 查看网关审计流水 (Audit Logs)
 ```bash
 cumora-task logs --limit 10
 # 查看近 30 天中转调用耗时、成功/失败状态与摘要
