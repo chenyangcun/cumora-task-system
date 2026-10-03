@@ -133,7 +133,7 @@ def cmd_call(args):
             envelope["project"] = args.project
         if args.issue:
             issue_val = str(args.issue).strip().lstrip("#")
-            issue_url = issue_val if issue_val.startswith("http") else f"https://github.com/yetone/cumora/issues/{issue_val}"
+            issue_url = issue_val if issue_val.startswith("http") else f"https://github.com/chenyangcun/cumora/issues/{issue_val}"
             envelope["context"] = {
                 "issueUrl": issue_url
             }
