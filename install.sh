@@ -29,8 +29,12 @@ chmod +x "${INSTALL_DIR}/cumora-task"
 echo "🧠 正在安装 cumora-task-system Skill 至 ${SKILLS_DIR} ..."
 if [ -f "$(dirname "$0")/skills/cumora-task-system/SKILL.md" ]; then
     cp "$(dirname "$0")/skills/cumora-task-system/SKILL.md" "${SKILLS_DIR}/SKILL.md"
+    [ -d "${HOME}/skills/cumora-task-system" ] && cp "$(dirname "$0")/skills/cumora-task-system/SKILL.md" "${HOME}/skills/cumora-task-system/SKILL.md"
+    [ -d "/opt/data/skills/cumora-task-system" ] && cp "$(dirname "$0")/skills/cumora-task-system/SKILL.md" "/opt/data/skills/cumora-task-system/SKILL.md"
 else
     curl -fsSL "${REPO_RAW}/skills/cumora-task-system/SKILL.md" -o "${SKILLS_DIR}/SKILL.md"
+    [ -d "${HOME}/skills/cumora-task-system" ] && curl -fsSL "${REPO_RAW}/skills/cumora-task-system/SKILL.md" -o "${HOME}/skills/cumora-task-system/SKILL.md"
+    [ -d "/opt/data/skills/cumora-task-system" ] && curl -fsSL "${REPO_RAW}/skills/cumora-task-system/SKILL.md" -o "/opt/data/skills/cumora-task-system/SKILL.md"
 fi
 
 # 4. PATH 环境变量友好提示
