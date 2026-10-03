@@ -48,6 +48,7 @@ chmod +x bin/cumora-task
 | **两阶段认领** | `cumora-task claim gw_task_xxx` | 执行 Agent 物理认领，换取防伪签名 Receipt |
 | **心跳进度遥测** | `cumora-task progress gw_task_xxx --percent 50 --stage coding --msg "修远正在编写代码"` | 实时刷新进度与心跳，重置 10 分钟看门狗 |
 | **完成交单唤醒** | `cumora-task complete gw_task_xxx --result "PR #44 已通过测试并创建"` | 提交结项成果，触发网关逆向 A2A Webhook 唤醒发起方 |
+| **阻碍挂起与分诊** | `cumora-task block gw_task_xxx --reason "Postgres 连接超时"` | 任务挂起，触发 Jev 智能分诊派生解阻子任务与 DAG 级联恢复 |
 | **外部任务上报** | `cumora-task progress issue-43 --percent 30 --stage coding --msg "开始修复"` | 针对外部 GitHub Issue 直接上报，自动落库建档 |
 | **查询状态详情** | `cumora-task status gw_task_xxx` | 查看任务当前状态、进度百分比与执行结果 |
 | **拉取审计流水** | `cumora-task logs --limit 10` | 审计近 30 天调用的耗时、成功/失败状态与消息摘要 |

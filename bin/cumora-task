@@ -127,6 +127,23 @@ def cmd_progress(args):
         print(f"❌ 遥测上报失败: {res}")
         sys.exit(1)
 
+def cmd_block(args):
+    payload = {
+        "reason": args.reason,
+    }
+    if args.helper:
+        payload["helperAgent"] = args.helper
+    res = make_request(f"/api/gateway/tasks/{args.task_id}/block", method="POST", body=payload)
+    if res.get("ok"):
+        print(f"🛑 任务阻碍挂起成功: {args.task_id}")
+        print(f"  • Status:        blocked")
+        print(f"  • Helper Agent:  @{res.get('helperAgent')}")
+        print(f"  • Unblock Task:  {res.get('unblockTaskId')}")
+        print(f"  • Message:       {res.get('message')}")
+    else:
+        print(f"❌ 任务挂起失败: {res}")
+        sys.exit(1)
+
 def cmd_complete(args):
     payload = {
         "result": args.result,
@@ -152,6 +169,8 @@ def cmd_status(args):
         prog = res.get("progress", {})
         if prog:
             print(f"  • Progress:   {prog.get('percent')}% ({prog.get('stage')}) - {prog.get('message')}")
+        if res.get("healthState"):
+            print(f"  • HealthState:{res.get('healthState')}")
         if res.get("claimToken"):
             print(f"  • ClaimToken: {res.get('claimToken')}")
         if res.get("result"):
@@ -220,6 +239,13 @@ def main():
     p_comp.add_argument("--result", required=True, help="结项成果描述或 PR 链接")
     p_comp.add_argument("--token", help="两阶段凭据 (可选)")
     p_comp.set_defaults(func=cmd_complete)
+
+    # block
+    p_block = sub.add_parser("block", help="上报阻碍挂起任务 (触发 Jev 智能分诊派生解阻子任务)")
+    p_block.add_argument("task_id", help="网关任务 ID (如 gw_task_xxx)")
+    p_block.add_argument("--reason", required=True, help="阻碍原因详细描述")
+    p_block.add_argument("--helper", help="指定协助排查的 Agent (可选，不传则由 Jev 决策模型智能分诊)")
+    p_block.set_defaults(func=cmd_block)
 
     # status
     p_stat = sub.add_parser("status", help="查询任务详情与状态")
